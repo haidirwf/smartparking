@@ -31,6 +31,7 @@ export const NewBooking: React.FC = () => {
     // Dialog and success states
     const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
     const [successBooking, setSuccessBooking] = React.useState<Booking | null>(null);
+    const [mutationError, setMutationError] = React.useState<string | null>(null);
 
     // 2. Fetch Active Booking, Areas and Vehicles
     const { data: activeBooking, isLoading: isLoadingActive } = useQuery<Booking | null>({
@@ -47,7 +48,7 @@ export const NewBooking: React.FC = () => {
             const res = await api.get<ParkingArea[]>(API_ENDPOINTS.AREAS);
             return res.data;
         },
-        enabled: !activeBooking,
+        enabled: !activeBooking || !activeBooking.id,
     });
 
     const { data: vehicles, isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({
@@ -56,7 +57,7 @@ export const NewBooking: React.FC = () => {
             const res = await api.get<Vehicle[]>(API_ENDPOINTS.VEHICLES);
             return res.data;
         },
-        enabled: !activeBooking,
+        enabled: !activeBooking || !activeBooking.id,
     });
 
     // 3. Set default selections when data loads
@@ -93,11 +94,16 @@ export const NewBooking: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['parkingAreas'] });
             setSuccessBooking(newBooking);
             setIsConfirmOpen(false);
+            setMutationError(null);
         },
+        onError: (err: any) => {
+            setMutationError(err.response?.data?.message || 'Failed to complete booking. Please try again.');
+        }
     });
 
     const handleConfirmBooking = () => {
         if (!selectedSlot || !selectedVehicleId || !arrivalTime) return;
+        setMutationError(null);
         bookingMutation.mutate({
             parking_slot_id: selectedSlot.id,
             vehicle_id: selectedVehicleId,
@@ -116,7 +122,7 @@ export const NewBooking: React.FC = () => {
     }
 
     // If user already has an active session/booking
-    if (activeBooking) {
+    if (activeBooking && activeBooking.id) {
         return (
             <div className="max-w-md mx-auto space-y-6">
                 <Card className="border border-primary/20">
@@ -438,6 +444,13 @@ export const NewBooking: React.FC = () => {
                         <Calendar className="h-5 w-5 text-primary" />
                         Confirm Reservation
                     </h2>
+                    
+                    {mutationError && (
+                        <div className="rounded-xl bg-danger-custom/10 p-3 text-xs font-semibold text-danger-custom border border-danger-custom/25">
+                            {mutationError}
+                        </div>
+                    )}
+
                     <p className="text-sm text-text-secondary leading-relaxed">
                         Are you sure you want to reserve slot <strong className="text-text-custom">{selectedSlot?.slot_number}</strong>? 
                         Once confirmed, your booking QR will be generated and you will have 30 minutes to check in at the gate.
